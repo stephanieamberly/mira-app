@@ -10,3 +10,4 @@ google-auth
 google-auth-oauthlib
 speechrecognition
 pypdfium2
+dateparser
