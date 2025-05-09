@@ -1,0 +1,12 @@
+streamlit
+pdfplumber
+python-docx
+nltk
+spacy
+pandas
+numpy
+google-api-python-client
+google-auth
+google-auth-oauthlib
+speechrecognition
+pypdfium2
