@@ -29,6 +29,23 @@ def ensure_onboarding_table():
 # Ensure it runs on load
 ensure_onboarding_table()
 
+def ensure_job_descriptions_table():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS job_descriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Run both table creation functions
+ensure_onboarding_table()
+ensure_job_descriptions_table()
+
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
     # --- 🧠 Ask MIRA ---
     with tab1:
