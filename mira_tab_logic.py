@@ -46,6 +46,20 @@ def ensure_job_descriptions_table():
 ensure_onboarding_table()
 ensure_job_descriptions_table()
 
+def ensure_mira_logs_table():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mira_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT,
+            answer TEXT,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
     # --- 🧠 Ask MIRA ---
     with tab1:
