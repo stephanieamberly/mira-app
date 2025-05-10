@@ -8,6 +8,27 @@ from io import StringIO
 
 DB_FILE = "mira_resumes.db"
 
+def ensure_onboarding_table():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS onboarding_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            position TEXT,
+            start_date TEXT,
+            salary REAL,
+            filepath TEXT,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Ensure it runs on load
+ensure_onboarding_table()
+
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
     # --- 🧠 Ask MIRA ---
     with tab1:
