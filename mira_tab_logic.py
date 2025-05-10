@@ -120,3 +120,7 @@ with tab7:
         st.markdown(f"**Q:** {row[0]}")
         st.markdown(f"**A:** {row[1]}")
         st.markdown("---")
+
+def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
+    # Your tab content goes here exactly as written
+
