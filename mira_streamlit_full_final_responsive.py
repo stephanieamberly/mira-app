@@ -1,49 +1,74 @@
-# mira_streamlit_full_final_responsive.py
 import streamlit as st
+from mira_tab_logic import render_tabs
+from datetime import datetime
+import sqlite3
 import os
 import base64
-from datetime import datetime
-from mira_tab_logic import render_tabs
 
-# --- Database Initialization ---
-from mira_tab_logic import DB_FILE
-if not os.path.exists(DB_FILE):
-    import sqlite3
+DB_FILE = "mira_resumes.db"
+
+def init_db():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
+
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS resumes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, email TEXT, phone TEXT,
-            skills TEXT, experience TEXT,
-            filename TEXT, timestamp TEXT
-        )
+    CREATE TABLE IF NOT EXISTS resumes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        phone TEXT,
+        skills TEXT,
+        experience TEXT,
+        filename TEXT,
+        timestamp TEXT
+    )
     """)
+
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS mira_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            question TEXT, answer TEXT, timestamp TEXT
-        )
+    CREATE TABLE IF NOT EXISTS mira_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question TEXT,
+        answer TEXT,
+        timestamp TEXT
+    )
     """)
+
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS onboarding_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, email TEXT, position TEXT,
-            start_date TEXT, salary TEXT, filepath TEXT, timestamp TEXT
-        )
+    CREATE TABLE IF NOT EXISTS onboarding_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        position TEXT,
+        start_date TEXT,
+        salary TEXT,
+        filepath TEXT,
+        timestamp TEXT
+    )
     """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS job_descriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT,
+        timestamp TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
-# --- Theme + Config ---
+def get_base64_image(image_path):
+    with open(image_path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+# --- Streamlit Config & Setup ---
 st.set_page_config(page_title="MIRA Assistant", layout="wide")
+init_db()
 
-# --- Branding / Header ---
-mira_img_path = "mira.png"
-if os.path.exists(mira_img_path):
-    with open(mira_img_path, "rb") as f:
-        mira_img_base64 = base64.b64encode(f.read()).decode()
-
+# --- MIRA Branding ---
+mira_img_base64 = get_base64_image("mira.png")
+col1, col2, col3 = st.columns([1, 10, 1])
+with col2:
     st.markdown(f'''
         <style>
             .mira-header {{
@@ -72,15 +97,6 @@ if os.path.exists(mira_img_path):
             <h1>MIRA: Your AI Recruiting Assistant</h1>
         </div>
     ''', unsafe_allow_html=True)
-
-st.markdown("""
-    <style>
-    .stTabs [data-baseweb="tab-list"] {
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # --- Tab Setup ---
 TABS = [
