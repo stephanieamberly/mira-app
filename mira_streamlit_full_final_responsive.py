@@ -80,8 +80,8 @@ def schedule_google_event(candidate_name, candidate_email, interview_date, inter
         'reminders': {'useDefault': True},
         'conferenceData': {
             'createRequest': {
-                'requestId': f"{candidate_name.replace(' ', '_')}_interview",
-                'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+                'requestId': f"{candidate_email.replace('@', '_')}_interview",
+                'conferenceSolutionKey': {'type': 'eventHangout'}
             }
         }
     }
