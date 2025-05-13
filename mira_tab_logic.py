@@ -1,12 +1,44 @@
 import streamlit as st
 import sqlite3
-from datetime import datetime
-import dateparser
+from datetime import datetime, timedelta
 import re
-import csv
+import dateparser
+import base64
 from io import StringIO
+import csv
+import pdfplumber
+from docx import Document
+import os
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 DB_FILE = "mira_resumes.db"
+
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+
+def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title):
+    creds_dict = st.secrets["gcal"].to_dict()
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    service = build('calendar', 'v3', credentials=creds)
+    start_datetime = datetime.strptime(f"{interview_date} {interview_time}", "%Y-%m-%d %H:%M")
+    end_datetime = start_datetime + timedelta(hours=1)
+    event = {
+        'summary': f'Interview with {candidate_name} - {position_title}',
+        'location': 'Google Meet',
+        'description': f'Scheduled interview for {position_title} with {candidate_name}.',
+        'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'attendees': [{'email': candidate_email}],
+        'reminders': {'useDefault': True},
+        'conferenceData': {
+            'createRequest': {
+                'requestId': f"{candidate_email.replace('@', '_')}_interview",
+                'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+            }
+        }
+    }
+    created_event = service.events().insert(calendarId='primary', body=event, conferenceDataVersion=1).execute()
+    return created_event.get('htmlLink')
 
 def ensure_onboarding_table():
     conn = sqlite3.connect(DB_FILE)
@@ -59,6 +91,51 @@ def ensure_mira_logs_table():
     """)
     conn.commit()
     conn.close()
+
+def ensure_mira_logs_table():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mira_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT,
+            answer TEXT,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title):
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+
+    SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+    creds_dict = st.secrets["gcal"].to_dict()
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+
+    service = build('calendar', 'v3', credentials=creds)
+    start_datetime = datetime.strptime(f"{interview_date} {interview_time}", "%Y-%m-%d %H:%M")
+    end_datetime = start_datetime + timedelta(hours=1)
+
+    event = {
+        'summary': f'Interview with {candidate_name} - {position_title}',
+        'location': 'Google Meet',
+        'description': f'Scheduled interview for {position_title} with {candidate_name}.',
+        'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'attendees': [{'email': candidate_email}],
+        'reminders': {'useDefault': True},
+        'conferenceData': {
+            'createRequest': {
+                'requestId': f"{candidate_email.replace('@', '_')}_interview",
+                'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+            }
+        }
+    }
+
+    created_event = service.events().insert(calendarId='primary', body=event, conferenceDataVersion=1).execute()
+    return created_event.get('htmlLink')
 
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
     # --- 🧠 Ask MIRA ---
