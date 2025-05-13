@@ -1,150 +1,196 @@
 import streamlit as st
+from datetime import datetime
 import sqlite3
-from datetime import datetime, timedelta
-import re
+import os
+import base64
 import dateparser
-from io import StringIO
+import re
 import csv
-from mira_streamlit_full_final_responsive import ask_gpt, extract_text_from_pdf, extract_text_from_docx, extract_details, save_to_db, schedule_google_event
+from io import StringIO
+from mira_tab_helpers import (
+    ask_gpt,
+    extract_text_from_pdf,
+    extract_text_from_docx,
+    extract_details,
+    save_to_db,
+    schedule_google_event
+)
 
 DB_FILE = "mira_resumes.db"
 
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS resumes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        phone TEXT,
+        skills TEXT,
+        experience TEXT,
+        filename TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS mira_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question TEXT,
+        answer TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS onboarding_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        position TEXT,
+        start_date TEXT,
+        salary TEXT,
+        filepath TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS job_descriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def get_base64_image(image_path):
+    with open(image_path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+# --- Streamlit Config & Setup ---
+st.set_page_config(page_title="MIRA Assistant", layout="wide")
+init_db()
+
+# --- MIRA Branding ---
+mira_img_base64 = get_base64_image("mira.png")
+col1, col2, col3 = st.columns([1, 10, 1])
+with col2:
+    st.markdown(f'''
+        <style>
+            .mira-header {{
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                text-align: center;
+            }}
+            .mira-header img {{
+                width: 80px;
+                height: 80px;
+                object-fit: cover;
+                border-radius: 50%;
+                border: 3px solid #d9a125;
+            }}
+            .mira-header h1 {{
+                font-size: 1.8em;
+                color: #a047fa;
+                margin: 0;
+            }}
+        </style>
+        <div class="mira-header">
+            <img src="data:image/png;base64,{mira_img_base64}" />
+            <h1>MIRA: Your AI Recruiting Assistant</h1>
+        </div>
+    ''', unsafe_allow_html=True)
+
+# --- Tab Setup ---
+TABS = [
+    "🤖 Ask MIRA", 
+    "📄 Resumes", 
+    "🗕 Calendar & Onboarding", 
+    "📁 Onboarding Docs", 
+    "📂 Job Descriptions", 
+    "📈 Upskilling & Coaching",
+    "📚 MIRA Q&A Log"
+]
+
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(TABS)
+
+# --- Define render_tabs directly ---
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
-    # --- 🤖 Ask MIRA ---
     with tab1:
         st.subheader("🧠 How can I help?")
-        user_input = ""
-        if st.button("🎤 Start Listening"):
-            st.info("Voice input activated (simulated in web version)")
-
-        typed_input = st.text_input("Type your command here:")
-        if typed_input:
-            user_input = typed_input
-
+        user_input = st.text_input("Type your command here:")
         if user_input:
-            name_match = re.search(r"with ([A-Z][a-z]+(?: [A-Z][a-z]+)?)", user_input)
-            position_match = re.search(r"for (the )?(.*?)( role| position)?( on| at| next| this|\\.|$)", user_input)
-            datetime_obj = dateparser.parse(user_input)
-            name = name_match.group(1) if name_match else ""
-            position = position_match.group(2).strip() if position_match else ""
-            date = datetime_obj.date().strftime("%Y-%m-%d") if datetime_obj else ""
-            time = datetime_obj.time().strftime("%H:%M") if datetime_obj else ""
+            try:
+                response = ask_gpt(user_input)
+                st.markdown(f"**MIRA says:** {response}")
+                conn = sqlite3.connect(DB_FILE)
+                conn.execute("INSERT INTO mira_logs (question, answer, timestamp) VALUES (?, ?, ?)", (user_input, response, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                st.error(f"Error: {e}")
 
-            gpt_response = ask_gpt(user_input)
-            st.success(f"MIRA says: {gpt_response}")
-
-            conn = sqlite3.connect(DB_FILE)
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS mira_logs (
-                    question TEXT, answer TEXT, timestamp TEXT
-                )
-            """)
-            cur.execute("INSERT INTO mira_logs (question, answer, timestamp) VALUES (?, ?, ?)",
-                        (user_input, gpt_response, datetime.now().isoformat()))
-            conn.commit()
-            conn.close()
-
-    # --- 📄 Resumes ---
     with tab2:
-        st.subheader("📄 Resume Viewer")
-        search_query = st.text_input("Search stored resumes:")
-        conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        if search_query:
-            cur.execute("""
-                SELECT * FROM resumes
-                WHERE name LIKE ? OR email LIKE ? OR skills LIKE ? OR experience LIKE ?
-            """, (f"%{search_query}%",)*4)
-        else:
-            cur.execute("SELECT * FROM resumes")
-        rows = cur.fetchall()
-        for r in rows:
+        st.subheader("📂 View Resumes")
+        search = st.text_input("Search by name, email, skills, etc.")
+        resumes = fetch_resumes(search)
+        for r in resumes:
             st.markdown(f"**{r[1]}** | {r[2]} | {r[3]}")
             st.markdown(f"**Skills:** {r[4][:150]}...")
             st.markdown(f"**Experience:** {r[5][:200]}...")
             st.markdown("---")
 
-        csv_output = StringIO()
-        writer = csv.writer(csv_output)
-        writer.writerow(["ID", "Name", "Email", "Phone", "Skills", "Experience", "Filename", "Timestamp"])
-        writer.writerows(rows)
-        st.download_button("⬇️ Export Resumes", data=csv_output.getvalue(), file_name="resumes_log.csv", mime="text/csv")
-
-        st.subheader("📄 Upload Resume")
-        uploaded_file = st.file_uploader("Upload a resume (.pdf or .docx)", type=["pdf", "docx"])
-        if uploaded_file:
-            ext = uploaded_file.name.split(".")[-1].lower()
-            raw_text = extract_text_from_pdf(uploaded_file) if ext == "pdf" else extract_text_from_docx(uploaded_file)
-            name, email, phone, skills, experience = extract_details(raw_text)
-            save_to_db(name, email, phone, skills, experience, uploaded_file.name)
-            st.success(f"Saved: {name} | {email} | {phone}")
-
-    # --- 📅 Calendar & Onboarding ---
     with tab3:
-        st.subheader("📅 Schedule Interview")
+        st.subheader("📅 Interview Scheduling")
         with st.form("calendar_form"):
-            candidate_name = st.text_input("Candidate Name")
-            candidate_email = st.text_input("Candidate Email")
-            position_title = st.text_input("Position Title")
-            interview_date = st.date_input("Date", value=datetime.today())
-            interview_time = st.time_input("Time", value=datetime.now().time())
-            submitted = st.form_submit_button("📅 Schedule Interview")
-            if submitted:
-                link = schedule_google_event(candidate_name, candidate_email, interview_date.strftime("%Y-%m-%d"), interview_time.strftime("%H:%M"), position_title)
-                st.success(f"Scheduled: [View Interview]({link})")
+            name = st.text_input("Candidate Name")
+            email = st.text_input("Candidate Email")
+            position = st.text_input("Position Title")
+            date = st.date_input("Interview Date")
+            time = st.time_input("Interview Time")
+            if st.form_submit_button("📅 Schedule Interview"):
+                try:
+                    link = schedule_google_event(name, email, date.strftime("%Y-%m-%d"), time.strftime("%H:%M"), position)
+                    st.success(f"Scheduled! [View Interview]({link})")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
-    # --- 📁 Onboarding Docs ---
     with tab4:
-        st.subheader("📁 Sent Onboarding Docs")
+        st.subheader("📁 Onboarding Docs")
         conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS onboarding_logs (
-                name TEXT, email TEXT, position TEXT, start_date TEXT, salary REAL, filepath TEXT, timestamp TEXT
-            )
-        """)
-        docs = cur.execute("SELECT name, email, position, start_date, salary, filepath, timestamp FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
-        for d in docs:
-            st.markdown(f"**{d[0]}** | {d[1]} | {d[2]} | {d[3]} | ${d[4]}")
-            st.markdown(f"📄 [Download]({d[5]}) | 🕒 Sent: {d[6]}")
+        rows = conn.execute("SELECT * FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
+        for r in rows:
+            st.markdown(f"**{r[1]}** | {r[2]} | {r[3]} | ${r[5]} | Sent: {r[7]}")
             st.markdown("---")
 
-    # --- 📂 Job Descriptions ---
     with tab5:
         st.subheader("📂 Job Descriptions")
         conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS job_descriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, timestamp TEXT
-            )
-        """)
-        jd_entries = cur.execute("SELECT id, content, timestamp FROM job_descriptions ORDER BY timestamp DESC").fetchall()
-        for jd in jd_entries:
+        jobs = conn.execute("SELECT * FROM job_descriptions ORDER BY timestamp DESC").fetchall()
+        for jd in jobs:
             st.markdown(f"📝 **Generated:** {jd[2]}")
             st.code(jd[1])
             st.markdown("---")
 
-    # --- 📈 Upskilling & Coaching ---
     with tab6:
-        st.subheader("📈 Upskilling & Manager Coaching")
-        st.markdown("Coming soon: Automatically generate personalized growth plans and coaching tips for leadership.")
+        st.subheader("📈 Upskilling & Coaching")
+        st.info("Coming soon: AI-generated coaching tips and growth plans")
 
-    # --- 📚 MIRA Q&A Log ---
     with tab7:
-        st.subheader("📚 MIRA Q&A Log")
+        st.subheader("📚 Q&A Log")
         conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS mira_logs (
-                question TEXT, answer TEXT, timestamp TEXT
-            )
-        """)
-        rows = cur.execute("SELECT question, answer, timestamp FROM mira_logs ORDER BY timestamp DESC").fetchall()
-        for row in rows:
-            st.markdown(f"**🕒 {row[2]}**")
-            st.markdown(f"**Q:** {row[0]}")
-            st.markdown(f"**A:** {row[1]}")
+        logs = conn.execute("SELECT * FROM mira_logs ORDER BY timestamp DESC").fetchall()
+        for row in logs:
+            st.markdown(f"🕒 {row[3]}\n**Q:** {row[1]}\n**A:** {row[2]}")
             st.markdown("---")
+
+# --- Render all tabs ---
+render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7)
