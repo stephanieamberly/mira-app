@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import os
 import base64
@@ -7,17 +7,88 @@ import dateparser
 import re
 import csv
 from io import StringIO
-from mira_tab_helpers import (
-    ask_gpt,
-    extract_text_from_pdf,
-    extract_text_from_docx,
-    extract_details,
-    save_to_db,
-    schedule_google_event
-)
+import pdfplumber
+from docx import Document
+import openai
 
 DB_FILE = "mira_resumes.db"
 
+# --- HELPER FUNCTIONS ---
+def ask_gpt(prompt):
+    openai.api_key = st.secrets["openai"]["api_key"]
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are MIRA, an intelligent, helpful, and friendly AI recruiting assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content.strip()
+
+def extract_text_from_pdf(file):
+    with pdfplumber.open(file) as pdf:
+        return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+
+def extract_text_from_docx(file):
+    doc = Document(file)
+    return "\n".join([para.text for para in doc.paragraphs])
+
+def extract_details(text):
+    name = text.split("\n")[0].strip() if text else ""
+    email_match = re.search(r"[\w\.-]+@[\w\.-]+", text)
+    phone_match = re.search(r"(\+\d{1,2}\s)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text)
+    email = email_match.group() if email_match else ""
+    phone = phone_match.group() if phone_match else ""
+    skills = experience = ""
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if "skills" in line.lower():
+            skills = "\n".join(lines[i+1:i+6])
+        if "experience" in line.lower():
+            experience = "\n".join(lines[i+1:i+10])
+    return name, email, phone, skills, experience
+
+def save_to_db(name, email, phone, skills, experience, filename):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO resumes (name, email, phone, skills, experience, filename, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (name, email, phone, skills, experience, filename, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title):
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+
+    creds_dict = st.secrets["gcal"].to_dict()
+    creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/calendar.events"])
+    service = build('calendar', 'v3', credentials=creds)
+
+    start_datetime = datetime.strptime(f"{interview_date} {interview_time}", "%Y-%m-%d %H:%M")
+    end_datetime = start_datetime + timedelta(hours=1)
+
+    event = {
+        'summary': f'Interview with {candidate_name} - {position_title}',
+        'location': 'Google Meet',
+        'description': f'Scheduled interview for {position_title} with {candidate_name}.',
+        'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
+        'attendees': [{'email': candidate_email}],
+        'reminders': {'useDefault': True},
+        'conferenceData': {
+            'createRequest': {
+                'requestId': f"{candidate_email.replace('@', '_')}_interview",
+                'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+            }
+        }
+    }
+
+    event = service.events().insert(calendarId='primary', body=event, conferenceDataVersion=1).execute()
+    return event.get('htmlLink')
+
+# --- DB SETUP ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -68,15 +139,14 @@ def init_db():
     conn.commit()
     conn.close()
 
+# --- UI ---
+st.set_page_config(page_title="MIRA Assistant", layout="wide")
+init_db()
+
 def get_base64_image(image_path):
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-# --- Streamlit Config & Setup ---
-st.set_page_config(page_title="MIRA Assistant", layout="wide")
-init_db()
-
-# --- MIRA Branding ---
 mira_img_base64 = get_base64_image("mira.png")
 col1, col2, col3 = st.columns([1, 10, 1])
 with col2:
@@ -109,7 +179,6 @@ with col2:
         </div>
     ''', unsafe_allow_html=True)
 
-# --- Tab Setup ---
 TABS = [
     "🤖 Ask MIRA", 
     "📄 Resumes", 
@@ -122,7 +191,22 @@ TABS = [
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(TABS)
 
-# --- Define render_tabs directly ---
+# --- Render all tabs ---
+def fetch_resumes(query=""):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    if query:
+        cur.execute("""
+            SELECT * FROM resumes
+            WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
+            OR skills LIKE ? OR experience LIKE ?
+        """, (f"%{query}%",)*5)
+    else:
+        cur.execute("SELECT * FROM resumes")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
     with tab1:
         st.subheader("🧠 How can I help?")
@@ -192,5 +276,4 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
             st.markdown(f"🕒 {row[3]}\n**Q:** {row[1]}\n**A:** {row[2]}")
             st.markdown("---")
 
-# --- Render all tabs ---
 render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7)
