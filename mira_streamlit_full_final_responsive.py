@@ -38,38 +38,6 @@ if not os.path.exists(DB_FILE):
 # --- Theme + Config ---
 st.set_page_config(page_title="MIRA Assistant", layout="wide")
 
-# --- Header Branding ---
-def get_base64_image(image_path):
-    with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-mira_img_base64 = get_base64_image("mira.png")
-st.markdown(f'''
-    <style>
-        .mira-header {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-        }}
-        .mira-header img {{
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid #d9a125;
-        }}
-        .mira-header h1 {{
-            color: #a047fa;
-            font-size: 1.8rem;
-        }}
-    </style>
-    <div class="mira-header">
-        <img src="data:image/png;base64,{mira_img_base64}" />
-        <h1>MIRA: Your AI Recruiting Assistant</h1>
-    </div>
-''', unsafe_allow_html=True)
-
 # --- Branding / Header ---
 mira_img_path = "mira.png"
 if os.path.exists(mira_img_path):
