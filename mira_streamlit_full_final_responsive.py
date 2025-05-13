@@ -60,7 +60,7 @@ def save_to_db(name, email, phone, skills, experience, filename):
     conn.commit()
     conn.close()
 
-def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title):
+def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title, teams_link):
     from google.oauth2.service_account import Credentials
     from googleapiclient.discovery import build
 
@@ -73,25 +73,15 @@ def schedule_google_event(candidate_name, candidate_email, interview_date, inter
 
     event = {
         'summary': f'Interview with {candidate_name} - {position_title}',
-        'location': 'Google Meet',
-        'description': f'Scheduled interview for {position_title} with {candidate_name}.',
+        'location': teams_link,
+        'description': f'Scheduled interview for {position_title} with {candidate_name}.\n\nJoin via Teams: {teams_link}',
         'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
         'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
-        'reminders': {'useDefault': True},
-        'conferenceData': {
-            'createRequest': {
-                'requestId': f"{candidate_email.replace('@', '_')}_interview",
-                'conferenceSolutionKey': {'type': 'eventHangout'}
-            }
-        }
+        'attendees': [{'email': candidate_email}],
+        'reminders': {'useDefault': True}
     }
 
-    event = service.events().insert(
-        calendarId='primary',
-        body=event,
-        conferenceDataVersion=1
-    ).execute()
-
+    event = service.events().insert(calendarId='primary', body=event).execute()
     return event.get('htmlLink')
 
 # --- DB SETUP ---
@@ -236,20 +226,28 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
             st.markdown(f"**Experience:** {r[5][:200]}...")
             st.markdown("---")
 
-    with tab3:
-        st.subheader("📅 Interview Scheduling")
-        with st.form("calendar_form"):
-            name = st.text_input("Candidate Name")
-            email = st.text_input("Candidate Email")
-            position = st.text_input("Position Title")
-            date = st.date_input("Interview Date")
-            time = st.time_input("Interview Time")
-            if st.form_submit_button("📅 Schedule Interview"):
-                try:
-                    link = schedule_google_event(name, email, date.strftime("%Y-%m-%d"), time.strftime("%H:%M"), position)
-                    st.success(f"Scheduled! [View Interview]({link})")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+with tab3:
+    st.subheader("📅 Interview Scheduling")
+    with st.form("calendar_form"):
+        name = st.text_input("Candidate Name")
+        email = st.text_input("Candidate Email")
+        position = st.text_input("Position Title")
+        date = st.date_input("Interview Date")
+        time = st.time_input("Interview Time")
+        teams_link = st.text_input("Microsoft Teams Link (Paste here)")
+
+        if st.form_submit_button("📅 Schedule Interview"):
+            try:
+                link = schedule_google_event(
+                    name, email,
+                    date.strftime("%Y-%m-%d"),
+                    time.strftime("%H:%M"),
+                    position,
+                    teams_link
+                )
+                st.success(f"Scheduled! [View Interview]({link})")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
     with tab4:
         st.subheader("📁 Onboarding Docs")
