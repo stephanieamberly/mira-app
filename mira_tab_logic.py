@@ -12,6 +12,8 @@ import os
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
+from mira_streamlit_full_final_responsive import schedule_google_event
+
 DB_FILE = "mira_resumes.db"
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
