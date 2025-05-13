@@ -1,4 +1,7 @@
-import streamlit as st
+Import streamlit as st
+st.set_page_config(page_title="MIRA Assistant", layout="wide")
+init_db()
+
 from datetime import datetime, timedelta
 import sqlite3
 import os
@@ -75,17 +78,21 @@ def schedule_google_event(candidate_name, candidate_email, interview_date, inter
         'description': f'Scheduled interview for {position_title} with {candidate_name}.',
         'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
         'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
-        'attendees': [{'email': candidate_email}],
         'reminders': {'useDefault': True},
         'conferenceData': {
             'createRequest': {
-                'requestId': f"{candidate_email.replace('@', '_')}_interview",
+                'requestId': f"{candidate_name.replace(' ', '_')}_interview",
                 'conferenceSolutionKey': {'type': 'hangoutsMeet'}
             }
         }
     }
 
-    event = service.events().insert(calendarId='primary', body=event, conferenceDataVersion=1).execute()
+    event = service.events().insert(
+        calendarId='primary',
+        body=event,
+        conferenceDataVersion=1
+    ).execute()
+
     return event.get('htmlLink')
 
 # --- DB SETUP ---
@@ -140,8 +147,6 @@ def init_db():
     conn.close()
 
 # --- UI ---
-st.set_page_config(page_title="MIRA Assistant", layout="wide")
-init_db()
 
 def get_base64_image(image_path):
     with open(image_path, "rb") as f:
