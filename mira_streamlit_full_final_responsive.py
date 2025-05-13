@@ -1,6 +1,8 @@
 import streamlit as st
-st.set_page_config(page_title="MIRA Assistant", layout="wide")
-init_db()
+from mira_tab_logic import init_db, render_tabs  # ✅ import BEFORE calling it
+
+st.set_page_config(page_title="MIRA Assistant", layout="wide")  # ✅ must be first Streamlit command
+init_db()  # ✅ now safe to call after imports
 
 from datetime import datetime, timedelta
 import sqlite3
