@@ -10,6 +10,7 @@ import csv
 from io import StringIO
 import pdfplumber
 from docx import Document
+from docx.shared import Pt
 
 DB_FILE = "mira_resumes.db"
 
@@ -60,6 +61,33 @@ def save_to_db(name, email, phone, skills, experience, filename):
 
 def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title, teams_link="https://teams.microsoft.com/l/meetup-join/abc123"):
     return teams_link or "https://teams.microsoft.com/l/meetup-join/abc123"
+
+def generate_onboarding_doc(name, email, position, start_date, salary):
+    doc = Document()
+    doc.add_heading('Offer Letter', 0)
+    doc.add_paragraph(f"Dear {name},")
+    doc.add_paragraph(f"We are excited to offer you the position of {position}. Your start date will be {start_date}, with a starting salary of ${salary}.")
+    doc.add_paragraph("Please let us know if you have any questions.")
+    doc.add_paragraph("Sincerely,\nHR Team")
+
+    for para in doc.paragraphs:
+        for run in para.runs:
+            run.font.size = Pt(11)
+
+    filepath = f"onboarding_docs/{name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d%H%M%S')}.docx"
+    os.makedirs("onboarding_docs", exist_ok=True)
+    doc.save(filepath)
+
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO onboarding_logs (name, email, position, start_date, salary, filepath, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (name, email, position, start_date, salary, filepath, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+    return filepath
 
 # --- DB SETUP ---
 def init_db():
@@ -210,20 +238,24 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
             name = st.text_input("Candidate Name")
             email = st.text_input("Candidate Email")
             position = st.text_input("Position Title")
-            date = st.date_input("Interview Date")
-            time = st.time_input("Interview Time")
-            teams_link = "https://teams.microsoft.com/l/meetup-join/abc123"  # auto-filled link
+            start_date = st.date_input("Start Date")
+            salary = st.text_input("Offered Salary")
+            interview_date = st.date_input("Interview Date")
+            interview_time = st.time_input("Interview Time")
+            teams_link = "https://teams.microsoft.com/l/meetup-join/abc123"
 
-            if st.form_submit_button("📅 Schedule Interview"):
+            if st.form_submit_button("📅 Schedule & Generate Onboarding"):
                 try:
                     link = schedule_google_event(
                         name, email,
-                        date.strftime("%Y-%m-%d"),
-                        time.strftime("%H:%M"),
+                        interview_date.strftime("%Y-%m-%d"),
+                        interview_time.strftime("%H:%M"),
                         position,
                         teams_link
                     )
-                    st.success(f"Scheduled! [Join Interview]({link})")
+                    filepath = generate_onboarding_doc(name, email, position, start_date.strftime("%Y-%m-%d"), salary)
+                    st.success(f"✅ Scheduled! Join link: {link}")
+                    st.success(f"📄 Onboarding Doc: {filepath}")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -233,6 +265,7 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
         rows = conn.execute("SELECT * FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
         for r in rows:
             st.markdown(f"**{r[1]}** | {r[2]} | {r[3]} | ${r[5]} | Sent: {r[7]}")
+            st.markdown(f"📄 File: {r[6]}")
             st.markdown("---")
 
     with tab5:
