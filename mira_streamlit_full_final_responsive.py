@@ -103,7 +103,10 @@ def init_db():
         skills TEXT,
         experience TEXT,
         filename TEXT,
-        timestamp TEXT
+        timestamp TEXT,
+        job_title TEXT DEFAULT '',
+        status TEXT DEFAULT 'New',
+        score INTEGER DEFAULT 0
     )
     """)
 
@@ -137,156 +140,50 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS branding_assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        content TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS feedback_surveys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        candidate_name TEXT,
+        rating INTEGER,
+        comments TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS coaching_materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        notes TEXT,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS analytics_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        metric TEXT,
+        value INTEGER,
+        timestamp TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS voice_assistant_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transcript TEXT,
+        timestamp TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
-
-# --- UI ---
-st.set_page_config(page_title="MIRA Assistant", layout="wide")
-init_db()
-
-def get_base64_image(image_path):
-    with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-mira_img_base64 = get_base64_image("mira.png")
-st.markdown(f'''
-    <style>
-        .mira-header {{
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 16px;
-            text-align: left;
-            margin-bottom: 20px;
-        }}
-        .mira-header img {{
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 50%;
-            border: 3px solid #d9a125;
-        }}
-        .mira-header h1 {{
-            font-size: 1.8em;
-            color: #a047fa;
-            margin: 0;
-        }}
-    </style>
-    <div class="mira-header">
-        <img src="data:image/png;base64,{mira_img_base64}" />
-        <h1>MIRA: Your AI Recruiting Assistant</h1>
-    </div>
-''', unsafe_allow_html=True)
-
-TABS = [
-    "🤖 Ask MIRA", 
-    "📄 Resumes", 
-    "🗕 Calendar & Onboarding", 
-    "📁 Onboarding Docs", 
-    "📂 Job Descriptions", 
-    "📈 Upskilling & Coaching",
-    "📚 MIRA Q&A Log"
-]
-
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(TABS)
-
-# --- Render all tabs ---
-def fetch_resumes(query=""):
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    if query:
-        cur.execute("""
-            SELECT * FROM resumes
-            WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
-            OR skills LIKE ? OR experience LIKE ?
-        """, (f"%{query}%",)*5)
-    else:
-        cur.execute("SELECT * FROM resumes")
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
-    with tab1:
-        st.subheader("🧠 How can I help?")
-        user_input = st.text_input("Type your command here:")
-        if user_input:
-            try:
-                response = ask_gpt(user_input)
-                st.markdown(f"**MIRA says:** {response}")
-                conn = sqlite3.connect(DB_FILE)
-                conn.execute("INSERT INTO mira_logs (question, answer, timestamp) VALUES (?, ?, ?)", (user_input, response, datetime.now().isoformat()))
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-    with tab2:
-        st.subheader("📂 View Resumes")
-        search = st.text_input("Search by name, email, skills, etc.")
-        resumes = fetch_resumes(search)
-        for r in resumes:
-            st.markdown(f"**{r[1]}** | {r[2]} | {r[3]}")
-            st.markdown(f"**Skills:** {r[4][:150]}...")
-            st.markdown(f"**Experience:** {r[5][:200]}...")
-            st.markdown("---")
-
-    with tab3:
-        st.subheader("📅 Interview Scheduling")
-        with st.form("calendar_form"):
-            name = st.text_input("Candidate Name")
-            email = st.text_input("Candidate Email")
-            position = st.text_input("Position Title")
-            start_date = st.date_input("Start Date")
-            salary = st.text_input("Offered Salary")
-            interview_date = st.date_input("Interview Date")
-            interview_time = st.time_input("Interview Time")
-            teams_link = "https://teams.microsoft.com/l/meetup-join/abc123"
-
-            if st.form_submit_button("📅 Schedule & Generate Onboarding"):
-                try:
-                    link = schedule_google_event(
-                        name, email,
-                        interview_date.strftime("%Y-%m-%d"),
-                        interview_time.strftime("%H:%M"),
-                        position,
-                        teams_link
-                    )
-                    filepath = generate_onboarding_doc(name, email, position, start_date.strftime("%Y-%m-%d"), salary)
-                    st.success(f"✅ Scheduled! Join link: {link}")
-                    st.success(f"📄 Onboarding Doc: {filepath}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    with tab4:
-        st.subheader("📁 Onboarding Docs")
-        conn = sqlite3.connect(DB_FILE)
-        rows = conn.execute("SELECT * FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
-        for r in rows:
-            st.markdown(f"**{r[1]}** | {r[2]} | {r[3]} | ${r[5]} | Sent: {r[7]}")
-            st.markdown(f"📄 File: {r[6]}")
-            st.markdown("---")
-
-    with tab5:
-        st.subheader("📂 Job Descriptions")
-        conn = sqlite3.connect(DB_FILE)
-        jobs = conn.execute("SELECT * FROM job_descriptions ORDER BY timestamp DESC").fetchall()
-        for jd in jobs:
-            st.markdown(f"📝 **Generated:** {jd[2]}")
-            st.code(jd[1])
-            st.markdown("---")
-
-    with tab6:
-        st.subheader("📈 Upskilling & Coaching")
-        st.info("Coming soon: AI-generated coaching tips and growth plans")
-
-    with tab7:
-        st.subheader("📚 Q&A Log")
-        conn = sqlite3.connect(DB_FILE)
-        logs = conn.execute("SELECT * FROM mira_logs ORDER BY timestamp DESC").fetchall()
-        for row in logs:
-            st.markdown(f"🕒 {row[3]}\n**Q:** {row[1]}\n**A:** {row[2]}")
-            st.markdown("---")
-
-render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7)
