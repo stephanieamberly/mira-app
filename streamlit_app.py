@@ -207,7 +207,29 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
 
     with tab4:
         st.subheader("📁 Onboarding Documents")
-        st.info("Generated offer letters and onboarding files will appear here.")
+
+        with st.form("onboarding_form"):
+            name = st.text_input("Candidate Name")
+            email = st.text_input("Candidate Email")
+            position = st.text_input("Position Title")
+            start_date = st.date_input("Start Date")
+            salary = st.number_input("Salary Offered", min_value=30000, step=500)
+            submitted = st.form_submit_button("📄 Generate Offer Letter")
+
+            if submitted:
+                filepath = generate_onboarding_doc(name, email, position, start_date, salary)
+                st.success(f"Offer letter generated for {name}")
+                with open(filepath, "rb") as f:
+                    st.download_button("⬇️ Download Document", data=f, file_name=os.path.basename(filepath), mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+        conn = sqlite3.connect(DB_FILE)
+        docs = conn.execute("SELECT name, email, position, start_date, salary, filepath, timestamp FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
+        conn.close()
+
+        for d in docs:
+            st.markdown(f"**{d[0]}** | {d[1]} | {d[2]} | Start: {d[3]} | 💰 ${d[4]}")
+            st.markdown(f"[📄 Download]({d[5]}) — Created: *{d[6]}*")
+            st.markdown("---")
 
     with tab5:
         st.subheader("📂 Job Description Hub")

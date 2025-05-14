@@ -187,3 +187,40 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# --- RENDER TABS ---
+def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
+    with tab1:
+        st.subheader("🤖 Ask MIRA")
+        user_input = st.text_input("Ask me anything related to recruiting, HR, or employer branding:")
+        if user_input:
+            response = ask_gpt(user_input)
+            st.markdown(f"**MIRA says:** {response}")
+
+    with tab2:
+        st.subheader("📄 Resume Viewer")
+        st.info("Resume parsing, tagging, and scoring interface coming soon.")
+
+    with tab3:
+        st.subheader("📅 Calendar & Interview Scheduling")
+        st.info("This will support interview links and calendar sync.")
+
+    with tab4:
+        st.subheader("📁 Onboarding Documents")
+        st.info("Generated offer letters and onboarding files will appear here.")
+
+    with tab5:
+        st.subheader("📂 Job Description Hub")
+        st.info("View or generate templated job descriptions.")
+
+    with tab6:
+        st.subheader("🎨 Employer Branding")
+        st.info("Upload brand assets or generate culture content here.")
+
+    with tab7:
+        st.subheader("📊 Analytics & Feedback")
+        st.info("Snapshot metrics and feedback survey results.")
+
+    with tab8:
+        st.subheader("📈 Upskilling & Coaching")
+        st.info("Curate training paths or manager coaching logs.")
