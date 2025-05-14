@@ -1,5 +1,5 @@
 import streamlit as st
-from openai import OpenAI
+import openai
 from datetime import datetime, timedelta
 import sqlite3
 import os
@@ -16,8 +16,8 @@ DB_FILE = "mira_resumes.db"
 
 # --- HELPER FUNCTIONS ---
 def ask_gpt(prompt):
-    client = OpenAI(api_key=st.secrets["openai"]["api_key"])
-    response = client.chat.completions.create(
+    openai.api_key = st.secrets["openai"]["api_key"]
+    response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are MIRA, an intelligent, helpful, and friendly AI recruiting assistant."},
