@@ -191,16 +191,15 @@ def init_db():
 # --- RENDER TABS ---
 def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
     with tab1:
-        with tab1:
-    st.subheader("🧠 Ask MIRA")
+        st.subheader("🧠 Ask MIRA")
 
-    if st.button("🎤 Start Listening"):
-        st.info("Voice input activated (simulated)")
+        if st.button("🎤 Start Listening"):
+            st.info("Voice input activated (simulated)")
 
-    user_input = st.text_input("Ask me anything related to recruiting, HR, or employer branding:")
-    if user_input:
-        response = ask_gpt(user_input)
-        st.markdown(f"**MIRA says:** {response}")
+        user_input = st.text_input("Ask me anything related to recruiting, HR, or employer branding:")
+        if user_input:
+            response = ask_gpt(user_input)
+            st.markdown(f"**MIRA says:** {response}")
 
     with tab2:
         st.subheader("📄 Resume Viewer")
