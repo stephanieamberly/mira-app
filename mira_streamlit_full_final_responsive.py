@@ -130,6 +130,7 @@ st.markdown(f'''
             justify-content: flex-start;
             gap: 16px;
             text-align: left;
+            margin-bottom: 20px;
         }}
         .mira-header img {{
             width: 80px;
