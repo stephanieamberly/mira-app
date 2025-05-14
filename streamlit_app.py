@@ -1,13 +1,15 @@
 import streamlit as st
 from mira_tab_logic import init_db, render_tabs
 import base64
-import os
 
 # MUST BE FIRST Streamlit command
 st.set_page_config(page_title="MIRA Assistant", layout="wide")
 
 # Initialize database
 init_db()
+
+import base64
+import os
 
 # --- MIRA Branding Header ---
 if os.path.exists("mira.png"):
