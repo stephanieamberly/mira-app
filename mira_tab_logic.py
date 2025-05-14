@@ -202,12 +202,62 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
             st.markdown(f"**MIRA says:** {response}")
 
     with tab2:
-        st.subheader("📄 Resume Viewer")
-        st.info("Resume parsing, tagging, and scoring interface coming soon.")
+    st.subheader("📄 Resume Viewer")
+
+    filter = st.text_input("Search resumes by name, email, skills, or experience")
+
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    if filter:
+        cur.execute("""
+            SELECT * FROM resumes
+            WHERE name LIKE ? OR email LIKE ? OR skills LIKE ? OR experience LIKE ?
+        """, (f"%{filter}%",)*4)
+    else:
+        cur.execute("SELECT * FROM resumes")
+    rows = cur.fetchall()
+    conn.close()
+
+    for r in rows:
+        st.markdown(f"**{r[1]}** | {r[2]} | {r[3]}")
+        st.markdown(f"**Skills:** {r[4][:150]}...")
+        st.markdown(f"**Experience:** {r[5][:200]}...")
+        st.markdown("---")
+
+    st.subheader("📤 Upload Resume")
+    uploaded_file = st.file_uploader("Upload a resume (.pdf or .docx)", type=["pdf", "docx"])
+    if uploaded_file:
+        ext = uploaded_file.name.split(".")[-1].lower()
+        raw_text = extract_text_from_pdf(uploaded_file) if ext == "pdf" else extract_text_from_docx(uploaded_file)
+        name, email, phone, skills, experience = extract_details(raw_text)
+        save_to_db(name, email, phone, skills, experience, uploaded_file.name)
+        st.success(f"Saved resume for: {name}")
 
     with tab3:
-        st.subheader("📅 Calendar & Interview Scheduling")
-        st.info("This will support interview links and calendar sync.")
+    st.subheader("📅 Calendar & Interview Scheduling")
+
+    with st.form("calendar_form"):
+        candidate_name = st.text_input("Candidate Name")
+        candidate_email = st.text_input("Candidate Email")
+        position_title = st.text_input("Position Title")
+        interview_date = st.date_input("Interview Date")
+        interview_time = st.time_input("Interview Time")
+        teams_link = st.text_input("Microsoft Teams Link (Paste here)")
+        submitted = st.form_submit_button("📅 Schedule Interview")
+
+        if submitted:
+            try:
+                link = schedule_google_event(
+                    candidate_name,
+                    candidate_email,
+                    interview_date.strftime("%Y-%m-%d"),
+                    interview_time.strftime("%H:%M"),
+                    position_title,
+                    teams_link
+                )
+                st.success(f"Interview scheduled! Join via [Teams]({link})")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
     with tab4:
         st.subheader("📁 Onboarding Documents")
@@ -223,9 +273,20 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
             if submitted:
                 filepath = generate_onboarding_doc(name, email, position, start_date, salary)
                 st.success(f"Offer letter generated for {name}")
-                with open(filepath, "rb") as f:
-                    st.download_button("⬇️ Download Document", data=f, file_name=os.path.basename(filepath), mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
+                if os.path.exists(filepath):
+                    with open(filepath, "rb") as f:
+                        file_data = f.read()
+                        st.download_button(
+                            "⬇️ Download Document",
+                            data=file_data,
+                            file_name=os.path.basename(filepath),
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                else:
+                    st.error("File could not be found. Please try again.")
+
+        # Show existing generated docs
         conn = sqlite3.connect(DB_FILE)
         docs = conn.execute("SELECT name, email, position, start_date, salary, filepath, timestamp FROM onboarding_logs ORDER BY timestamp DESC").fetchall()
         conn.close()
@@ -237,16 +298,97 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
 
     with tab5:
         st.subheader("📂 Job Description Hub")
-        st.info("View or generate templated job descriptions.")
+
+        with st.form("jd_form"):
+            jd_content = st.text_area("Paste or write a job description")
+            submitted = st.form_submit_button("💾 Save JD")
+            if submitted and jd_content.strip():
+                conn = sqlite3.connect(DB_FILE)
+                conn.execute("INSERT INTO job_descriptions (content, timestamp) VALUES (?, ?)", (jd_content, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+                st.success("Job description saved!")
+
+        st.markdown("### 📜 Saved Descriptions")
+        conn = sqlite3.connect(DB_FILE)
+        jds = conn.execute("SELECT content, timestamp FROM job_descriptions ORDER BY timestamp DESC").fetchall()
+        conn.close()
+
+        for content, ts in jds:
+            st.code(content)
+            st.caption(f"🕒 {ts}")
+            st.markdown("---")
 
     with tab6:
-        st.subheader("🎨 Employer Branding")
-        st.info("Upload brand assets or generate culture content here.")
+        st.subheader("🎨 Employer Branding Assets")
+
+        with st.form("branding_form"):
+            name = st.text_input("Asset Name")
+            content = st.text_area("Content, link, or description")
+            submitted = st.form_submit_button("📥 Upload")
+            if submitted and name and content:
+                conn = sqlite3.connect(DB_FILE)
+                conn.execute("INSERT INTO branding_assets (name, content, timestamp) VALUES (?, ?, ?)", (name, content, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+                st.success(f"Uploaded asset: {name}")
+
+        conn = sqlite3.connect(DB_FILE)
+        assets = conn.execute("SELECT name, content, timestamp FROM branding_assets ORDER BY timestamp DESC").fetchall()
+        conn.close()
+
+        for name, content, ts in assets:
+            st.markdown(f"**{name}**")
+            st.markdown(content)
+            st.caption(f"🕒 {ts}")
+            st.markdown("---")
 
     with tab7:
-        st.subheader("📊 Analytics & Feedback")
-        st.info("Snapshot metrics and feedback survey results.")
+        st.subheader("📊 Feedback & Candidate Experience")
+
+        with st.form("feedback_form"):
+            name = st.text_input("Candidate Name")
+            rating = st.slider("How was your experience?", 1, 10)
+            comments = st.text_area("Additional feedback")
+            submitted = st.form_submit_button("📝 Submit Feedback")
+            if submitted:
+                conn = sqlite3.connect(DB_FILE)
+                conn.execute("INSERT INTO feedback_surveys (candidate_name, rating, comments, timestamp) VALUES (?, ?, ?, ?)", (name, rating, comments, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+                st.success("Thanks for your feedback!")
+
+        st.markdown("### Recent Feedback")
+        conn = sqlite3.connect(DB_FILE)
+        feedback = conn.execute("SELECT candidate_name, rating, comments, timestamp FROM feedback_surveys ORDER BY timestamp DESC").fetchall()
+        conn.close()
+
+        for name, rating, comments, ts in feedback:
+            st.markdown(f"**{name}** rated {rating}/10")
+            st.markdown(f"💬 {comments}")
+            st.caption(f"🕒 {ts}")
+            st.markdown("---")
 
     with tab8:
         st.subheader("📈 Upskilling & Coaching")
-        st.info("Curate training paths or manager coaching logs.")
+
+        with st.form("coaching_form"):
+            title = st.text_input("Coaching Topic")
+            notes = st.text_area("Training content or notes")
+            submitted = st.form_submit_button("📚 Save Entry")
+            if submitted:
+                conn = sqlite3.connect(DB_FILE)
+                conn.execute("INSERT INTO coaching_materials (title, notes, timestamp) VALUES (?, ?, ?)", (title, notes, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+                st.success(f"Coaching material saved: {title}")
+
+        conn = sqlite3.connect(DB_FILE)
+        coaching = conn.execute("SELECT title, notes, timestamp FROM coaching_materials ORDER BY timestamp DESC").fetchall()
+        conn.close()
+
+        for title, notes, ts in coaching:
+            st.markdown(f"### {title}")
+            st.markdown(notes)
+            st.caption(f"🕒 {ts}")
+            st.markdown("---")
