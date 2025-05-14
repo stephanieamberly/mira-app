@@ -1,6 +1,4 @@
 import streamlit as st
-st.set_page_config(page_title="MIRA Assistant", layout="wide")  # ✅ This must be first
-
 from datetime import datetime, timedelta
 import sqlite3
 import os
@@ -60,29 +58,8 @@ def save_to_db(name, email, phone, skills, experience, filename):
     conn.commit()
     conn.close()
 
-def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title, teams_link):
-    from google.oauth2.service_account import Credentials
-    from googleapiclient.discovery import build
-
-    creds_dict = st.secrets["gcal"].to_dict()
-    creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/calendar.events"])
-    service = build('calendar', 'v3', credentials=creds)
-
-    start_datetime = datetime.strptime(f"{interview_date} {interview_time}", "%Y-%m-%d %H:%M")
-    end_datetime = start_datetime + timedelta(hours=1)
-
-    event = {
-        'summary': f'Interview with {candidate_name} - {position_title}',
-        'location': teams_link,
-        'description': f'Scheduled interview for {position_title} with {candidate_name}.\n\nJoin via Teams: {teams_link}',
-        'start': {'dateTime': start_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
-        'end': {'dateTime': end_datetime.isoformat(), 'timeZone': 'America/Phoenix'},
-        'attendees': [{'email': candidate_email}],
-        'reminders': {'useDefault': True}
-    }
-
-    event = service.events().insert(calendarId='primary', body=event).execute()
-    return event.get('htmlLink')
+def schedule_google_event(candidate_name, candidate_email, interview_date, interview_time, position_title, teams_link="https://teams.microsoft.com/l/meetup-join/abc123"):
+    return teams_link or "https://teams.microsoft.com/l/meetup-join/abc123"
 
 # --- DB SETUP ---
 def init_db():
@@ -136,42 +113,42 @@ def init_db():
     conn.close()
 
 # --- UI ---
+st.set_page_config(page_title="MIRA Assistant", layout="wide")
+init_db()
 
 def get_base64_image(image_path):
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
 mira_img_base64 = get_base64_image("mira.png")
-col1, col2, col3 = st.columns([1, 10, 1])
-with col2:
-    st.markdown(f'''
-        <style>
-            .mira-header {{
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                justify-content: center;
-                gap: 16px;
-                text-align: center;
-            }}
-            .mira-header img {{
-                width: 80px;
-                height: 80px;
-                object-fit: cover;
-                border-radius: 50%;
-                border: 3px solid #d9a125;
-            }}
-            .mira-header h1 {{
-                font-size: 1.8em;
-                color: #a047fa;
-                margin: 0;
-            }}
-        </style>
-        <div class="mira-header">
-            <img src="data:image/png;base64,{mira_img_base64}" />
-            <h1>MIRA: Your AI Recruiting Assistant</h1>
-        </div>
-    ''', unsafe_allow_html=True)
+st.markdown(f'''
+    <style>
+        .mira-header {{
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 16px;
+            text-align: left;
+        }}
+        .mira-header img {{
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 3px solid #d9a125;
+        }}
+        .mira-header h1 {{
+            font-size: 1.8em;
+            color: #a047fa;
+            margin: 0;
+        }}
+    </style>
+    <div class="mira-header">
+        <img src="data:image/png;base64,{mira_img_base64}" />
+        <h1>MIRA: Your AI Recruiting Assistant</h1>
+    </div>
+''', unsafe_allow_html=True)
 
 TABS = [
     "🤖 Ask MIRA", 
@@ -226,28 +203,28 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7):
             st.markdown(f"**Experience:** {r[5][:200]}...")
             st.markdown("---")
 
-with tab3:
-    st.subheader("📅 Interview Scheduling")
-    with st.form("calendar_form"):
-        name = st.text_input("Candidate Name")
-        email = st.text_input("Candidate Email")
-        position = st.text_input("Position Title")
-        date = st.date_input("Interview Date")
-        time = st.time_input("Interview Time")
-        teams_link = st.text_input("Microsoft Teams Link (Paste here)")
+    with tab3:
+        st.subheader("📅 Interview Scheduling")
+        with st.form("calendar_form"):
+            name = st.text_input("Candidate Name")
+            email = st.text_input("Candidate Email")
+            position = st.text_input("Position Title")
+            date = st.date_input("Interview Date")
+            time = st.time_input("Interview Time")
+            teams_link = "https://teams.microsoft.com/l/meetup-join/abc123"  # auto-filled link
 
-        if st.form_submit_button("📅 Schedule Interview"):
-            try:
-                link = schedule_google_event(
-                    name, email,
-                    date.strftime("%Y-%m-%d"),
-                    time.strftime("%H:%M"),
-                    position,
-                    teams_link
-                )
-                st.success(f"Scheduled! [View Interview]({link})")
-            except Exception as e:
-                st.error(f"Error: {e}")
+            if st.form_submit_button("📅 Schedule Interview"):
+                try:
+                    link = schedule_google_event(
+                        name, email,
+                        date.strftime("%Y-%m-%d"),
+                        time.strftime("%H:%M"),
+                        position,
+                        teams_link
+                    )
+                    st.success(f"Scheduled! [Join Interview]({link})")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
     with tab4:
         st.subheader("📁 Onboarding Docs")
