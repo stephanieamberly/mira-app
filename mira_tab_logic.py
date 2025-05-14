@@ -202,62 +202,62 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
             st.markdown(f"**MIRA says:** {response}")
 
     with tab2:
-    st.subheader("📄 Resume Viewer")
+        st.subheader("📄 Resume Viewer")
 
-    filter = st.text_input("Search resumes by name, email, skills, or experience")
+        filter = st.text_input("Search resumes by name, email, skills, or experience")
 
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    if filter:
-        cur.execute("""
-            SELECT * FROM resumes
-            WHERE name LIKE ? OR email LIKE ? OR skills LIKE ? OR experience LIKE ?
-        """, (f"%{filter}%",)*4)
-    else:
-        cur.execute("SELECT * FROM resumes")
-    rows = cur.fetchall()
-    conn.close()
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        if filter:
+            cur.execute("""
+                SELECT * FROM resumes
+                WHERE name LIKE ? OR email LIKE ? OR skills LIKE ? OR experience LIKE ?
+            """, (f"%{filter}%",)*4)
+        else:
+            cur.execute("SELECT * FROM resumes")
+        rows = cur.fetchall()
+        conn.close()
 
-    for r in rows:
-        st.markdown(f"**{r[1]}** | {r[2]} | {r[3]}")
-        st.markdown(f"**Skills:** {r[4][:150]}...")
-        st.markdown(f"**Experience:** {r[5][:200]}...")
-        st.markdown("---")
+        for r in rows:
+            st.markdown(f"**{r[1]}** | {r[2]} | {r[3]}")
+            st.markdown(f"**Skills:** {r[4][:150]}...")
+            st.markdown(f"**Experience:** {r[5][:200]}...")
+            st.markdown("---")
 
-    st.subheader("📤 Upload Resume")
-    uploaded_file = st.file_uploader("Upload a resume (.pdf or .docx)", type=["pdf", "docx"])
-    if uploaded_file:
-        ext = uploaded_file.name.split(".")[-1].lower()
-        raw_text = extract_text_from_pdf(uploaded_file) if ext == "pdf" else extract_text_from_docx(uploaded_file)
-        name, email, phone, skills, experience = extract_details(raw_text)
-        save_to_db(name, email, phone, skills, experience, uploaded_file.name)
-        st.success(f"Saved resume for: {name}")
+        st.subheader("📤 Upload Resume")
+        uploaded_file = st.file_uploader("Upload a resume (.pdf or .docx)", type=["pdf", "docx"])
+        if uploaded_file:
+            ext = uploaded_file.name.split(".")[-1].lower()
+            raw_text = extract_text_from_pdf(uploaded_file) if ext == "pdf" else extract_text_from_docx(uploaded_file)
+            name, email, phone, skills, experience = extract_details(raw_text)
+            save_to_db(name, email, phone, skills, experience, uploaded_file.name)
+            st.success(f"Saved resume for: {name}")
 
     with tab3:
-    st.subheader("📅 Calendar & Interview Scheduling")
+        st.subheader("📅 Calendar & Interview Scheduling")
 
-    with st.form("calendar_form"):
-        candidate_name = st.text_input("Candidate Name")
-        candidate_email = st.text_input("Candidate Email")
-        position_title = st.text_input("Position Title")
-        interview_date = st.date_input("Interview Date")
-        interview_time = st.time_input("Interview Time")
-        teams_link = st.text_input("Microsoft Teams Link (Paste here)")
-        submitted = st.form_submit_button("📅 Schedule Interview")
+        with st.form("calendar_form"):
+            candidate_name = st.text_input("Candidate Name")
+            candidate_email = st.text_input("Candidate Email")
+            position_title = st.text_input("Position Title")
+            interview_date = st.date_input("Interview Date")
+            interview_time = st.time_input("Interview Time")
+            teams_link = st.text_input("Microsoft Teams Link (Paste here)")
+            submitted = st.form_submit_button("📅 Schedule Interview")
 
-        if submitted:
-            try:
-                link = schedule_google_event(
-                    candidate_name,
-                    candidate_email,
-                    interview_date.strftime("%Y-%m-%d"),
-                    interview_time.strftime("%H:%M"),
-                    position_title,
-                    teams_link
-                )
-                st.success(f"Interview scheduled! Join via [Teams]({link})")
-            except Exception as e:
-                st.error(f"Error: {e}")
+            if submitted:
+                try:
+                    link = schedule_google_event(
+                        candidate_name,
+                        candidate_email,
+                        interview_date.strftime("%Y-%m-%d"),
+                        interview_time.strftime("%H:%M"),
+                        position_title,
+                        teams_link
+                    )
+                    st.success(f"Interview scheduled! Join via [Teams]({link})")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
     with tab4:
         st.subheader("📁 Onboarding Documents")
