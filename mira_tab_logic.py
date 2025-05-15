@@ -276,17 +276,19 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
                 filepath = generate_onboarding_doc(name, email, position, start_date, salary)
                 st.success(f"Offer letter generated for {name}")
 
-                if os.path.exists(filepath):
+                if filepath and os.path.exists(filepath):
                     with open(filepath, "rb") as f:
-                        file_data = f.read()
+                        if file_data:
                         st.download_button(
                             "⬇️ Download Document",
                             data=file_data,
                             file_name=os.path.basename(filepath),
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         )
+                        else:
+                            st.error("File is empty or could not be read.")
                 else:
-                    st.error("File could not be found. Please try again.")
+                    st.error("OFfer letter file not found. Please try again.")
 
         # Show existing generated docs
         conn = sqlite3.connect(DB_FILE)

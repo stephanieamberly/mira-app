@@ -8,6 +8,7 @@ st.set_page_config(page_title="MIRA Assistant", layout="wide")
 
 # Initialize database
 init_db()
+show_header()
 
 # --- MIRA Branding Header ---
 if os.path.exists("mira.png"):
