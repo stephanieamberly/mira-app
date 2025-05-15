@@ -19,7 +19,10 @@ if os.path.exists("mira.png"):
                 <img src="data:image/png;base64,{encoded}" style="width:60px;height:60px;border-radius:50%;border:2px solid #a047fa;" />
                 <h1 style="font-size: 1.8em; color: #a047fa; margin: 0;'>MIRA: Your AI Recruiting Assistant</h1>
             </div>
-        """, unsafe_allow_html=True)
+        """.replace("<h1", "<h1").replace(";'>", "'>"), unsafe_allow_html=True)
+else:
+    st.title("MIRA: Your AI Recruiting Assistant")
+
 
 # --- Tab layout ---
 TABS = [
