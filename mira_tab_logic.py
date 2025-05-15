@@ -15,9 +15,11 @@ from docx.shared import Pt
 DB_FILE = "mira_resumes.db"
 
 # --- HELPER FUNCTIONS ---
+import openai
+
 def ask_gpt(prompt):
-    openai.api_key = st.secrets["openai"]["api_key"]
-    response = openai.ChatCompletion.create(
+    client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are MIRA, an intelligent, helpful, and friendly AI recruiting assistant."},
