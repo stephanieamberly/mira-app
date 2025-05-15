@@ -278,17 +278,15 @@ def render_tabs(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8):
 
                 if filepath and os.path.exists(filepath):
                     with open(filepath, "rb") as f:
-                        if file_data:
-                        st.download_button(
-                            "⬇️ Download Document",
-                            data=file_data,
-                            file_name=os.path.basename(filepath),
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        )
-                        else:
-                            st.error("File is empty or could not be read.")
-                else:
-                    st.error("OFfer letter file not found. Please try again.")
+                        file_data = f.read()
+                    st.download_button(
+                        "⬇️ Download Document",
+                        data=file_data,
+                        file_name=os.path.basename(filepath),
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+            else:
+                st.error("Failed to generate or locate the document.")
 
         # Show existing generated docs
         conn = sqlite3.connect(DB_FILE)
