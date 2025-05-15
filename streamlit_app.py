@@ -11,18 +11,16 @@ init_db()
 
 # --- MIRA Branding Header ---
 if os.path.exists("mira.png"):
-    mira_img_path = "mira.png"
-    with open(mira_img_path, "rb") as f:
+    with open("mira.png", "rb") as f:
         encoded = base64.b64encode(f.read()).decode()
         st.markdown(f"""
-            <div style='display: flex; align-items: center; gap: 12px; margin: 1rem 0 2.5rem 0;'>
+            <div style="display: flex; align-items: center; gap: 12px; margin: 1rem 0 2.5rem 0;">
                 <img src="data:image/png;base64,{encoded}" style="width:60px;height:60px;border-radius:50%;border:2px solid #a047fa;" />
-                <h1 style="font-size: 1.8em; color: #a047fa; margin: 0;'>MIRA: Your AI Recruiting Assistant</h1>
+                <h1 style="font-size: 1.8em; color: #a047fa; margin: 0;">MIRA: Your AI Recruiting Assistant</h1>
             </div>
-        """.replace("<h1", "<h1").replace(";'>", "'>"), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 else:
     st.title("MIRA: Your AI Recruiting Assistant")
-
 
 # --- Tab layout ---
 TABS = [
