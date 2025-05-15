@@ -24,7 +24,12 @@ if os.path.exists("mira.png"):
             </div>
         """, height=100)
 else:
-    st.markdown("### MIRA: Your AI Recruiting Assistant")
+st.markdown(f"""
+    <div style='display: flex; align-items: center; gap: 12px; margin: 1rem 0 2.5rem 0;'>
+        <img src="data:image/png;base64,{encoded}" style="width:60px;height:60px;border-radius:50%;border:2px solid #a047fa;" />
+        <h1 style="font-size: 1.8em; color: #a047fa; margin: 0;">MIRA: Your AI Recruiting Assistant</h1>
+    </div>
+""", unsafe_allow_html=True)
 
 # --- Tab layout ---
 TABS = [
